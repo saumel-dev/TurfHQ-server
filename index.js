@@ -45,7 +45,16 @@ const run = async () => {
             const newFacility = await facilitiesCollection.insertOne(facility);
             res.send(newFacility);
         })
-    } finally {
+
+        app.delete('/facilities/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await facilitiesCollection.deleteOne(query);
+            res.send(result);
+        })
+    }
+
+    finally {
 
         // await client.close();
     }
