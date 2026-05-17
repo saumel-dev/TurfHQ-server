@@ -39,7 +39,7 @@ const run = async () => {
             const facility = await facilitiesCollection.findOne(query);
             res.send(facility);
         })
-        
+
         app.post('/facilities', async (req, res) => {
             const facility = req.body;
             const newFacility = await facilitiesCollection.insertOne(facility);
