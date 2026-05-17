@@ -9,7 +9,7 @@ app.use(express.json());
 app.use(cors());
 dotenv.config();
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const uri = process.env.MONGODB_URI
 const PORT = process.env.PORT
@@ -28,8 +28,23 @@ const run = async () => {
         const db = client.db('TurfHQ');
         const facilitiesCollection = db.collection('facilities');
 
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        app.get('/facilities', async (req, res) => {
+            const facilities = await facilitiesCollection.find().toArray();
+            res.send(facilities);
+        })
+
+        app.get('/facilities/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const facility = await facilitiesCollection.findOne(query);
+            res.send(facility);
+        })
+        
+        app.post('/facilities', async (req, res) => {
+            const facility = req.body;
+            const newFacility = await facilitiesCollection.insertOne(facility);
+            res.send(newFacility);
+        })
     } finally {
 
         // await client.close();
