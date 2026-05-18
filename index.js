@@ -10,6 +10,7 @@ app.use(cors());
 dotenv.config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 
 const uri = process.env.MONGODB_URI
 const PORT = process.env.PORT
@@ -21,6 +22,28 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+const JWKS = createRemoteJWKSet(
+    new URL('http://localhost:3000/api/auth/jwks')
+)
+
+const VerifyToken = async (req, res, next) => {
+    const authHeader = req?.header.authorization;
+    if (!authHeader) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const { payload } = await jwtVerify(token, JWKS);
+        next();
+    }
+    catch (error) {
+        return res.send(error.message);
+    }
+
+}
 
 const run = async () => {
     try {
@@ -42,7 +65,7 @@ const run = async () => {
 
         app.get('/facilities/:id', async (req, res) => {
             const header = req.header.authorization;
-            
+
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const facility = await facilitiesCollection.findOne(query);
