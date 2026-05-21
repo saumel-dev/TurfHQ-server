@@ -24,23 +24,28 @@ const client = new MongoClient(uri, {
 });
 
 const JWKS = createRemoteJWKSet(
-    new URL('http://localhost:3000/api/auth/jwks')
+    new URL(`${process.env.BETTER_AUTH_URL}/api/auth/jwks`)
 )
 
 const VerifyToken = async (req, res, next) => {
-    const authHeader = req?.header.authorization;
+    const authHeader = req?.headers.authorization;
     if (!authHeader) {
         return res.status(401).json({ message: "Unauthorized" });
     }
 
     const token = authHeader.split(" ")[1];
 
+    if (!token || token === "undefined" || token === "null") {
+        return res.status(401).json({ message: "Unauthorized: Token is missing or corrupted" });
+    }
+
     try {
         const { payload } = await jwtVerify(token, JWKS);
         next();
     }
     catch (error) {
-        return res.send(error.message);
+        console.error("Verification Error details:", error);
+        return res.status(403).json({ message: "Forbidden" });
     }
 
 }
@@ -53,19 +58,30 @@ const run = async () => {
         const bookingsCollection = db.collection('bookings');
 
         app.get('/facilities', async (req, res) => {
-            const facilities = await facilitiesCollection.find().toArray();
-            res.send(facilities);
-        })
+            try {
+                const { searchTerm, type } = req.query;
+                let query = {};
 
-        app.get('/my-facilities', async (req, res) => {
-            const email = req.query.email;
-            const facilities = await facilitiesCollection.find({ owner_email: email }).toArray();
-            res.send(facilities);
+                if (searchTerm) {
+                    query.name = {
+                        $regex: searchTerm,
+                        $options: 'i'
+                    };
+                }
+
+                if (type) {
+                    query.facility_type = { $in: [type] };
+                }
+
+                const facilities = await facilitiesCollection.find(query).toArray();
+                res.send(facilities);
+            } catch (error) {
+                console.error("Error fetching facilities:", error);
+                res.status(500).send({ message: "Internal Server Error" });
+            }
         })
 
         app.get('/facilities/:id', async (req, res) => {
-            const header = req.header.authorization;
-
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const facility = await facilitiesCollection.findOne(query);
@@ -78,14 +94,21 @@ const run = async () => {
             res.send(newFacility);
         })
 
-        app.delete('/facilities/:id', async (req, res) => {
+        app.delete('/facilities/:id', VerifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await facilitiesCollection.deleteOne(query);
             res.send(result);
         })
 
-        app.patch('/facilities/:id', async (req, res) => {
+
+        app.get('/my-facilities', VerifyToken, async (req, res) => {
+            const email = req.query.email;
+            const facilities = await facilitiesCollection.find({ owner_email: email }).toArray();
+            res.send(facilities);
+        })
+
+        app.patch('/facilities/:id', VerifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const doc = req.body;
@@ -100,27 +123,20 @@ const run = async () => {
             res.send(bookings);
         })
 
-        app.get('/bookings/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: new ObjectId(id) };
-            const bookings = await bookingsCollection.findOne(query);
-            res.send(bookings);
-        })
-
-        app.post('/bookings', async (req, res) => {
+        app.post('/bookings', VerifyToken, async (req, res) => {
             const facility = req.body;
             const newBookings = await bookingsCollection.insertOne(facility);
             res.send(newBookings);
         })
 
-        app.delete('/bookings/:id', async (req, res) => {
+        app.delete('/bookings/:id', VerifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await bookingsCollection.deleteOne(query);
             res.send(result);
         })
 
-        app.patch('/bookings/:id', async (req, res) => {
+        app.patch('/bookings/:id', VerifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const doc = req.body;
