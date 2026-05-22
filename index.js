@@ -52,7 +52,7 @@ const VerifyToken = async (req, res, next) => {
 
 const run = async () => {
     try {
-        await client.connect();
+        // await client.connect();
         const db = client.db('TurfHQ');
         const facilitiesCollection = db.collection('facilities');
         const bookingsCollection = db.collection('bookings');
